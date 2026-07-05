@@ -1858,13 +1858,17 @@ function generateICS() {
 
   lines.push('END:VCALENDAR');
 
-  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
+  const icsContent = lines.join('\r\n');
+  // Safari iOS ne supporte pas Blob + createObjectURL pour le téléchargement
+  // On utilise un data URI encodé en base64
+  const encoded = btoa(unescape(encodeURIComponent(icsContent)));
+  const dataUri = 'data:text/calendar;charset=utf-8;base64,' + encoded;
   const a = document.createElement('a');
-  a.href = url;
+  a.href = dataUri;
   a.download = 'planning_ete_ECG_Paul.ics';
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
 }
 
 // =====================
