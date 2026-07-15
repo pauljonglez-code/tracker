@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ÉTÉ//ECG — Terminal de révisions</title>
+<style>
+  :root{
+    --bg: #0a0d10;
+    --bg-raised: #12161b;
+    --bg-card: #161b21;
+    --line: #232a32;
+    --text: #e7ebee;
+    --text-dim: #8993a1;
+    --text-faint: #576270;
+    --amber: #f0b90b;
+    --green: #0ecb81;
+    --red: #f6465d;
+    --blue: #4f9dff;
+    --purple: #a97cf0;
+    --pink: #e968a8;
+    --gray: #6b7280;
+    --mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    --sans: 'Inter', -apple-system, system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(240,185,11,0.06), transparent),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:80px;
+  }
+  a{color:inherit;}
+  ::selection{background:rgba(240,185,11,0.3);}
+
+  /* ---------- top ticker ---------- */
+  .ticker{
+    background:var(--bg-raised);
+    border-bottom:1px solid var(--line);
+    overflow:hidden;
+    white-space:nowrap;
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--text-dim);
+    padding:6px 0;
+    letter-spacing:0.02em;
+  }
+  .ticker__track{display:inline-block; padding-left:100%; animation:scroll 42s linear infinite;}
+  .ticker__track span{margin-right:38px;}
+  .up{color:var(--green);} .down{color:var(--red);} .warn{color:var(--amber);}
+  @keyframes scroll{ from{transform:translateX(0);} to{transform:translateX(-100%);} }
+
+  /* ---------- header ---------- */
+  header{
+    max-width:1180px; margin:0 auto; padding:28px 20px 8px;
+  }
+  .brand{display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:10px;}
+  .brand h1{
+    font-size:15px; font-family:var(--mono); letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--text-dim); margin:0; font-weight:600;
+  }
+  .brand h1 b{color:var(--amber);}
+  .clock{font-family:var(--mono); font-size:12px; color:var(--text-faint);}
+
+  .hero{
+    display:grid; grid-template-columns: 1.3fr 1fr; gap:16px; margin-top:18px;
+  }
+  @media (max-width:820px){ .hero{grid-template-columns:1fr;} }
+
+  .panel{
+    background:var(--bg-card); border:1px solid var(--line); border-radius:10px; padding:20px;
+  }
+  .panel h2{
+    font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:0.1em;
+    color:var(--text-faint); margin:0 0 14px; font-weight:600;
+  }
+
+  .bignum{font-family:var(--mono); font-size:46px; font-weight:700; line-height:1; color:var(--amber);}
+  .bignum small{font-size:16px; color:var(--text-dim); font-weight:500; margin-left:4px;}
+  .subrow{display:flex; gap:22px; margin-top:14px; flex-wrap:wrap;}
+  .subrow div{font-family:var(--mono); font-size:12px; color:var(--text-dim);}
+  .subrow div b{display:block; color:var(--text); font-size:16px; font-family:var(--mono);}
+
+  .bar{height:8px; border-radius:5px; background:#0e1216; overflow:hidden; margin-top:16px; border:1px solid var(--line);}
+  .bar > i{display:block; height:100%; background:linear-gradient(90deg,#c98f0a,var(--amber)); transition:width .5s;}
+
+  .status-line{display:flex; align-items:center; gap:8px; margin-top:12px; font-family:var(--mono); font-size:12px;}
+  .dot{width:8px;height:8px;border-radius:50%;}
+  .dot.on-track{background:var(--green); box-shadow:0 0 8px var(--green);}
+  .dot.behind{background:var(--red); box-shadow:0 0 8px var(--red);}
+  .dot.ahead{background:var(--blue); box-shadow:0 0 8px var(--blue);}
+
+  /* subject mini bars */
+  .subjects{display:flex; flex-direction:column; gap:10px;}
+  .subj-row{display:grid; grid-template-columns:74px 1fr 64px; align-items:center; gap:10px;}
+  .subj-name{font-family:var(--mono); font-size:11.5px; text-transform:uppercase; letter-spacing:0.04em;}
+  .subj-bar{height:6px; border-radius:4px; background:#0e1216; border:1px solid var(--line); overflow:hidden;}
+  .subj-bar>i{display:block;height:100%;}
+  .subj-pct{font-family:var(--mono); font-size:11.5px; text-align:right; color:var(--text-dim);}
+
+  /* ---------- nav ---------- */
+  nav{
+    max-width:1180px; margin:22px auto 0; padding:0 20px;
+    display:flex; gap:8px; flex-wrap:wrap;
+  }
+  nav button{
+    background:var(--bg-raised); border:1px solid var(--line); color:var(--text-dim);
+    font-family:var(--mono); font-size:11.5px; padding:8px 14px; border-radius:7px; cursor:pointer;
+    letter-spacing:0.03em; transition:all .15s;
+  }
+  nav button:hover{color:var(--text); border-color:#3a434e;}
+  nav button.active{background:var(--amber); color:#1a1300; border-color:var(--amber); font-weight:700;}
+
+  main{max-width:1180px; margin:0 auto; padding:20px;}
+
+  /* ---------- today ---------- */
+  .today-card{
+    background:var(--bg-card); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:18px;
+  }
+  .today-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;}
+  .today-head h2{margin:0; font-size:18px;}
+  .phase-tag{
+    font-family:var(--mono); font-size:10.5px; text-transform:uppercase; letter-spacing:0.08em;
+    color:var(--text-faint); border:1px solid var(--line); padding:3px 9px; border-radius:20px;
+  }
+
+  .task{
+    display:flex; align-items:flex-start; gap:12px; padding:11px 4px; border-bottom:1px solid var(--line);
+  }
+  .task:last-child{border-bottom:none;}
+  .task input[type=checkbox]{
+    appearance:none; width:19px; height:19px; min-width:19px; margin-top:2px; border-radius:5px;
+    border:1.5px solid var(--text-faint); cursor:pointer; position:relative; background:transparent;
+  }
+  .task input[type=checkbox]:checked{background:var(--green); border-color:var(--green);}
+  .task input[type=checkbox]:checked::after{
+    content:'✓'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-size:12px; color:#00190c; font-weight:900;
+  }
+  .task .t-body{flex:1; min-width:0;}
+  .task .t-label{font-size:14.5px; line-height:1.4;}
+  .task.done .t-label{color:var(--text-faint); text-decoration:line-through;}
+  .task .t-meta{display:flex; gap:8px; margin-top:5px; flex-wrap:wrap;}
+  .chip{
+    font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:0.05em;
+    padding:2px 7px; border-radius:4px; font-weight:700;
+  }
+  .chip.dur{background:#0e1216; color:var(--text-dim); border:1px solid var(--line); font-weight:500; text-transform:none;}
+  .chip.dissert{background:rgba(246,70,93,0.14); color:var(--red);}
+  .chip.resched{background:rgba(240,185,11,0.14); color:var(--amber);}
+  .chip.overflow{background:rgba(246,70,93,0.18); color:var(--red);}
+
+  .empty{color:var(--text-faint); font-family:var(--mono); font-size:13px; padding:10px 4px;}
+
+  /* anki ritual */
+  .anki-box{
+    display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:14px;
+    padding:12px 14px; background:#0e1216; border:1px dashed var(--line); border-radius:8px; flex-wrap:wrap;
+  }
+  .anki-box .left{display:flex; align-items:center; gap:10px;}
+  .anki-box label{font-family:var(--mono); font-size:12.5px; color:var(--text-dim); display:flex; align-items:center; gap:8px; cursor:pointer;}
+  .streak{font-family:var(--mono); font-size:12px; color:var(--amber);}
+
+  /* backlog panel */
+  .backlog{
+    background:var(--bg-card); border:1px solid var(--line); border-radius:10px; padding:20px; margin-bottom:18px;
+  }
+  .backlog-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+  .backlog-head h2{margin:0;}
+  .recalc-btn{
+    background:var(--bg-raised); border:1px solid var(--amber); color:var(--amber); font-family:var(--mono);
+    font-size:11px; padding:7px 12px; border-radius:6px; cursor:pointer; letter-spacing:0.03em;
+  }
+  .recalc-btn:hover{background:rgba(240,185,11,0.1);}
+  .note{color:var(--text-faint); font-family:var(--mono); font-size:11.5px; margin:0 0 14px; line-height:1.5;}
+  .book{display:grid; grid-template-columns:1fr 1fr; gap:18px;}
+  @media (max-width:820px){ .book{grid-template-columns:1fr;} }
+  .book-col h3{
+    font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:0.08em; margin:0 0 10px;
+  }
+  .book-col.queue h3{color:var(--red);}
+  .book-col.fits h3{color:var(--green);}
+  .row-line{
+    display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center;
+    font-family:var(--mono); font-size:12px; padding:7px 0; border-bottom:1px solid var(--line);
+  }
+  .row-line:last-child{border-bottom:none;}
+  .row-line .lbl{color:var(--text-dim); font-family:var(--sans); font-size:13px;}
+  .row-line .dest{color:var(--amber); white-space:nowrap;}
+  .row-line .dest.bad{color:var(--red);}
+
+  /* calendar / phase list */
+  .phase-block{margin-bottom:26px;}
+  .phase-title{
+    display:flex; align-items:center; gap:12px; margin-bottom:12px;
+  }
+  .phase-title h3{margin:0; font-size:15px;}
+  .phase-title .rng{font-family:var(--mono); font-size:11px; color:var(--text-faint);}
+  .phase-bilan{
+    font-family:var(--mono); font-size:11px; color:var(--text-faint); margin:0 0 12px; padding-left:2px;
+    border-left:2px solid var(--line); padding-left:10px; line-height:1.6;
+  }
+  .days-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px;}
+  .day-card{
+    background:var(--bg-card); border:1px solid var(--line); border-radius:9px; padding:14px;
+    transition:border-color .15s;
+  }
+  .day-card.is-today{border-color:var(--amber); box-shadow:0 0 0 1px rgba(240,185,11,0.25);}
+  .day-card.is-past{opacity:0.72;}
+  .day-card.is-off{background:repeating-linear-gradient(135deg, var(--bg-card), var(--bg-card) 10px, #14181d 10px, #14181d 20px);}
+  .day-card-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;}
+  .day-date{font-family:var(--mono); font-size:12.5px; font-weight:700;}
+  .day-pct{font-family:var(--mono); font-size:11px; color:var(--text-faint);}
+  .day-card .task{padding:7px 0;}
+  .day-card .t-label{font-size:13px;}
+
+  footer{max-width:1180px;margin:30px auto; padding:20px; text-align:center; color:var(--text-faint); font-family:var(--mono); font-size:11px;}
+</style>
+</head>
+<body>
+
+<div class="ticker"><div class="ticker__track" id="tickerTrack"></div></div>
+
+<header>
+  <div class="brand">
+    <h1>ÉTÉ // <b>ECG</b> — TERMINAL DE RÉVISIONS · Marcelin Berthelot</h1>
+    <div class="clock" id="clock"></div>
+  </div>
+
+  <div class="hero">
+    <div class="panel">
+      <h2>Progression globale — 10 juil → 29 août</h2>
+      <div class="bignum" id="globalPct">0<small>%</small></div>
+      <div class="bar"><i id="globalBar" style="width:0%"></i></div>
+      <div class="status-line">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">calcul…</span>
+      </div>
+      <div class="subrow">
+        <div><b id="statAnnales">0</b>annales ECG</div>
+        <div><b id="statDissert">0/4</b>dissertations</div>
+        <div><b id="statDaysLeft">–</b>jours restants</div>
+        <div><b id="statDone">0</b>tâches faites</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Par matière</h2>
+      <div class="subjects" id="subjectBars"></div>
+    </div>
+  </div>
+</header>
+
+<nav id="navBtns">
+  <button data-view="today" class="active">Aujourd'hui</button>
+  <button data-view="backlog">File de reprogrammation</button>
+  <button data-view="all">Planning complet</button>
+</nav>
+
+<main>
+
+  <section id="view-today">
+    <div class="today-card">
+      <div class="today-head">
+        <h2 id="todayTitle">—</h2>
+        <span class="phase-tag" id="todayPhase">—</span>
+      </div>
+      <div id="todayTasks"></div>
+      <div class="anki-box">
+        <div class="left">
+          <label><input type="checkbox" id="ankiToday"> Anki fait aujourd'hui (créneaux fixes de la phase)</label>
+        </div>
+        <div class="streak" id="ankiStreak">série : 0j</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-backlog" style="display:none">
+    <div class="backlog">
+      <div class="backlog-head">
+        <h2 style="margin:0">File de reprogrammation automatique</h2>
+        <button class="recalc-btn" id="recalcBtn">↻ Recalculer</button>
+      </div>
+      <p class="note">Règle : toute tâche non cochée dont la date est passée entre en file, triée par priorité (Maths &gt; ESH/dissertations &gt; Lettres/Philo &gt; Anglais &gt; Espagnol &gt; Python). Elle est ensuite insérée dans le premier créneau futur disponible (les jours off/allégés absorbent le plus ; les jours de stage n'ont presque pas de marge). Ce qui ne rentre nulle part avant le 29 août s'affiche en « à sacrifier ».</p>
+      <div class="book">
+        <div class="book-col queue">
+          <h3>En retard → reprogrammé</h3>
+          <div id="queueList"></div>
+        </div>
+        <div class="book-col fits">
+          <h3>Impossible à recaser (à couper)</h3>
+          <div id="overflowList"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-all" style="display:none">
+    <div id="allPhases"></div>
+  </section>
+
+</main>
+
+<footer>tracker généré pour l'été 2026 · données stockées en local (localStorage), aucun envoi réseau</footer>
+
+<script>
+/* =========================================================================
+   DONNÉES
+========================================================================= */
+const SUBJECTS = {
+  maths:    {label:'Maths',    color:'#f0b90b', priority:1},
+  esh:      {label:'ESH',      color:'#0ecb81', priority:2},
+  lettres:  {label:'Lettres',  color:'#f6465d', priority:3},
+  philo:    {label:'Philo',    color:'#a97cf0', priority:3},
+  anglais:  {label:'Anglais',  color:'#4f9dff', priority:4},
+  espagnol: {label:'Espagnol', color:'#e968a8', priority:5},
+  autre:    {label:'Autre',    color:'#6b7280', priority:6},
+};
+
+// flex capacity (minutes) disponible par jour pour absorber du retard, selon la phase / le type de jour
+const FLEX = {
+  'stage-normal': 20,
+  'stage-off': 300,
+  'potes-normal': 60,
+  'potes-off': 400,
+  'bnf-normal': 90,
+  'bnf-light': 260,
+  'upec-normal': 90,
+};
+
+let TID = 0;
+function t(date, subject, label, dur, opts){
+  opts = opts || {};
+  TID++;
+  return {id:'t'+TID, date, subject, label, dur, dissert: !!opts.dissert};
+}
+
+const PHASES = [
+  {key:'stage-A', label:'Stage restauration — Bloc A', range:'10 → 15 juillet', flexKey:'stage', bilan:"Ch.1/3/4/5/8/14/22 maths (7/7 chapitres P1) · ESH Ch.1→5 fichés · Érasme / Pic de la Mirandole / Kant / Molière / Sartre lus et fichés · 1 dissertation philo", days:[]},
+  {key:'stage-B', label:'Stage restauration — Bloc B', range:'16 → 21 juillet', flexKey:'stage', bilan:"Ch.2/15/9/16/17/10 maths · ESH Ch.6→8 + 17/18 refaits · Plihon fini · Primo Levi fini · 1 dissertation lettres", days:[]},
+  {key:'stage-C', label:'Stage restauration — Bloc C', range:'22 → 27 juillet', flexKey:'stage', bilan:"Ch.11/12/13/18/19/20/21 maths → programme maths 100% (20/20) · ESH Ch.19→23 → ESH 100% (23/23) · Keslassy fini · Lévi-Strauss fait · 1 DS lettres", days:[]},
+  {key:'stage-S3', label:'Stage restauration — S3', range:'28 juillet → 3 août', flexKey:'stage', bilan:"Maths 100% + Amyot 10/10 · ESH 100% · 4 dissertations + 2 DS lettres · 3 annales ECG · 10+ œuvres/auteurs lus et fichés", days:[]},
+  {key:'potes', label:'Semaine potes', range:'4 → 13 août', flexKey:'potes', bilan:"10 annales ECG · Python revu · toutes matières consolidées par khôlles croisées", days:[]},
+  {key:'bnf', label:'BnF François-Mitterrand', range:'14 → 24 août', flexKey:'bnf', bilan:"8 annales ECG maths + 4 ESH · Philo/Lettres mis en réseau · Anglais/Espagnol consolidés · bilan de fragilités écrit", days:[]},
+  {key:'upec', label:'UPEC — phase finale', range:'25 → 29 août', flexKey:'upec', bilan:"Dernière ligne avant la rentrée du 30 août (DST espagnol semaine 1)", days:[]},
+];
+
+const OFF_DATES = ['2026-07-15','2026-07-21','2026-07-27','2026-08-04','2026-08-13'];
+const LIGHT_DATES = ['2026-08-15'];
+
+function addDay(phaseKey, date, tasks){
+  const ph = PHASES.find(p=>p.key===phaseKey);
+  const isOff = OFF_DATES.includes(date);
+  const isLight = LIGHT_DATES.includes(date);
+  ph.days.push({date, tasks, isOff, isLight, phaseKey});
+}
+
+/* ---- BLOC A ---- */
+addDay('stage-A','2026-07-10',[ t('2026-07-10','maths','Ch.1 Raisonnements + Ch.3 Ensembles (groupé)',180), t('2026-07-10','esh','ESH Ch.1 fichage + lecture Érasme, Éloge de la folie',180) ]);
+addDay('stage-A','2026-07-11',[ t('2026-07-11','maths','Ch.4 Limite et continuité',180), t('2026-07-11','esh','ESH Ch.2 fichage + Pic de la Mirandole',180) ]);
+addDay('stage-A','2026-07-12',[ t('2026-07-12','maths','Ch.5 Étude globale des fonctions',180), t('2026-07-12','esh','ESH Ch.3 fichage + Kant',180) ]);
+addDay('stage-A','2026-07-13',[ t('2026-07-13','maths','Ch.8 Polynômes',180), t('2026-07-13','esh','ESH Ch.4 fichage + Molière, Le Misanthrope',180) ]);
+addDay('stage-A','2026-07-14',[ t('2026-07-14','maths','Ch.14 Équivalences/négligeabilité + Ch.22 DL (groupé)',180), t('2026-07-14','esh','ESH Ch.5 fichage + Sartre',180) ]);
+addDay('stage-A','2026-07-15',[ t('2026-07-15','philo','Dissertation Philo complète — 3h chronométrées, sans notes',180,{dissert:true}) ]);
+
+/* ---- BLOC B ---- */
+addDay('stage-B','2026-07-16',[ t('2026-07-16','maths','Ch.2 Suites réelles',180), t('2026-07-16','esh','ESH Ch.6 fichage + Plihon, Les capitalismes contemporains (début)',180) ]);
+addDay('stage-B','2026-07-17',[ t('2026-07-17','maths','Ch.15 Séries numériques',180), t('2026-07-17','esh','ESH Ch.7 fichage + Plihon (suite)',180) ]);
+addDay('stage-B','2026-07-18',[ t('2026-07-18','maths','Ch.9 Probabilités + Ch.16 Espace probabilisé (groupé)',180), t('2026-07-18','esh','ESH Ch.8 fichage + Primo Levi, Si c\'est un homme (début)',180) ]);
+addDay('stage-B','2026-07-19',[ t('2026-07-19','maths','Ch.17 Variables aléatoires discrètes',180), t('2026-07-19','esh','ESH Ch.17 à refaire + Primo Levi (fin)',180) ]);
+addDay('stage-B','2026-07-20',[ t('2026-07-20','maths','Ch.10 Dérivation',180), t('2026-07-20','esh','ESH Ch.18 à refaire + consolidation fiches œuvres',180) ]);
+addDay('stage-B','2026-07-21',[ t('2026-07-21','lettres','Dissertation Lettres complète — 3h chronométrées, sans notes',180,{dissert:true}) ]);
+
+/* ---- BLOC C ---- */
+addDay('stage-C','2026-07-22',[ t('2026-07-22','maths','Ch.11 Intégration sur segment',180), t('2026-07-22','esh','ESH Ch.19 fichage + Espagnol Amérique latine (carte mentale)',180) ]);
+addDay('stage-C','2026-07-23',[ t('2026-07-23','maths','Ch.12 EV + Ch.13 Compléments EV (groupé)',180), t('2026-07-23','esh','ESH Ch.20 à refaire + Espagnol chefs d\'État',180) ]);
+addDay('stage-C','2026-07-24',[ t('2026-07-24','maths','Ch.18 Applications linéaires',180), t('2026-07-24','esh','ESH Ch.21 fichage + Keslassy & Rodrigues (début)',180) ]);
+addDay('stage-C','2026-07-25',[ t('2026-07-25','maths','Ch.19 Matrices et applications linéaires',180), t('2026-07-25','esh','ESH Ch.22 fichage + Keslassy (suite)',180) ]);
+addDay('stage-C','2026-07-26',[ t('2026-07-26','maths','Ch.20 Intégrale quelconque + Ch.21 Dérivation successive (groupé)',180), t('2026-07-26','esh','ESH Ch.23 fichage + Lévi-Strauss',180) ]);
+addDay('stage-C','2026-07-27',[ t('2026-07-27','lettres','Dissertation Lettres — DS n°1 complet, 3h chronométrées',180,{dissert:true}) ]);
+
+/* ---- S3 ---- */
+addDay('stage-S3','2026-07-28',[ t('2026-07-28','maths','1ère annale ECG chronométrée + autocorrection',180), t('2026-07-28','esh','Combe (fin) + Couppey-Soubeyran Ch.1-2 + Anglais DS n°1 + carnet d\'erreurs',180) ]);
+addDay('stage-S3','2026-07-29',[ t('2026-07-29','maths','2ème annale ECG chronométrée + autocorrection',180), t('2026-07-29','anglais','Couppey-Soubeyran (fin) + Anglais DS n°2 + présentation d\'ouvrage oral',180) ]);
+addDay('stage-S3','2026-07-30',[ t('2026-07-30','maths','Amyot Ex.1 + Ex.2 + Ex.3 (fonctions, séries, suites récurrentes)',180), t('2026-07-30','lettres','Lettres DS n°2 complet + copie HEC annotée + Philo auteurs 1-3',180) ]);
+addDay('stage-S3','2026-07-31',[ t('2026-07-31','maths','Amyot Ex.4 + Ex.5 + Ex.6 (polynômes, EV)',180), t('2026-07-31','philo','Philo auteurs 4-6 + Espagnol Al Grano + simulation DST néocolonialisme',180) ]);
+addDay('stage-S3','2026-08-01',[ t('2026-08-01','maths','Amyot Ex.7 + Ex.8 + Ex.9 (projecteurs, AL, matrices, séries/probas)',180), t('2026-08-01','philo','Dissertation complète — 3h sans notes chronométrée (4ème dissert de l\'été)',180,{dissert:true}) ]);
+addDay('stage-S3','2026-08-02',[ t('2026-08-02','maths','Amyot Ex.10 + 3ème annale ECG chronométrée',180), t('2026-08-02','philo','Philo auteurs 7-10 + fin Huxley + Audeguy (fiches 6 sections)',180) ]);
+addDay('stage-S3','2026-08-03',[ t('2026-08-03','maths','Fiche erreurs récurrentes globale + fiche formules complète (analyse/AL/probas)',180), t('2026-08-03','esh','Anki ESH review total + début 1984 + Boulle, La Planète des singes (fiche)',180) ]);
+
+/* ---- SEMAINE POTES ---- */
+addDay('potes','2026-08-04',[]); // OFF
+addDay('potes','2026-08-05',[
+  t('2026-08-05','maths','Annale ECG chronométrée + autocorrection',180),
+  t('2026-08-05','esh','ESH khôlle (prépa/traitement/oral/feedback)',120),
+  t('2026-08-05','maths','Maths khôlle',120),
+  t('2026-08-05','lettres','Lettres DS n°3 + correction groupée',120),
+  t('2026-08-05','anglais','Anglais thème/version type concours',30),
+  t('2026-08-05','espagnol','Espagnol traduction courte',30),
+  t('2026-08-05','anglais','1984 (suite) + Never Let Me Go (début)',90),
+]);
+addDay('potes','2026-08-06',[
+  t('2026-08-06','maths','Annale ECG chronométrée',180),
+  t('2026-08-06','esh','ESH khôlle',120),
+  t('2026-08-06','maths','Maths khôlle',120),
+  t('2026-08-06','philo','Révision orale des 10 auteurs sans notes',120),
+  t('2026-08-06','anglais','Anglais + Espagnol (30 min chacun)',60),
+  t('2026-08-06','anglais','1984 (fin) + fiche œuvre + Never Let Me Go (suite)',90),
+]);
+addDay('potes','2026-08-07',[
+  t('2026-08-07','maths','Annale ECG chronométrée',180),
+  t('2026-08-07','esh','ESH khôlle + lecture Keslassy',120),
+  t('2026-08-07','maths','Maths khôlle',120),
+  t('2026-08-07','lettres','Lettres DS n°4 + rapport de jury (lecture commentée)',120),
+  t('2026-08-07','espagnol','Espagnol néocolonialisme (fiche thématique)',30),
+  t('2026-08-07','anglais','Never Let Me Go (fin) + fiche + Of Mice and Men (début) + fiche',90),
+]);
+addDay('potes','2026-08-08',[
+  t('2026-08-08','maths','Annale ECG chronométrée',180),
+  t('2026-08-08','esh','ESH khôlle',120),
+  t('2026-08-08','maths','Maths khôlle + révision ciblée chapitres faibles',120),
+  t('2026-08-08','anglais','Anglais Big Picture + Word Perfect',120),
+  t('2026-08-08','espagnol','Espagnol actu',60),
+  t('2026-08-08','autre','Python — syntaxe, listes, boucles, fonctions, numpy',120),
+]);
+addDay('potes','2026-08-09',[
+  t('2026-08-09','maths','Annale ECG chronométrée',180),
+  t('2026-08-09','esh','ESH révision libre + Plihon (fiche de synthèse condensée)',120),
+  t('2026-08-09','maths','Maths khôlle',120),
+  t('2026-08-09','lettres','Lettres DS n°5 + carnet CG HEC',120),
+  t('2026-08-09','philo','Philo — Anki review massif (cartes en échec)',60),
+  t('2026-08-09','autre','Python (suite)',120),
+]);
+addDay('potes','2026-08-10',[
+  t('2026-08-10','maths','Annale ECG chronométrée',180),
+  t('2026-08-10','esh','ESH Anki review total (toutes cartes depuis le 10 juillet)',120),
+  t('2026-08-10','maths','Maths khôlle',120),
+  t('2026-08-10','anglais','Anglais présentation d\'ouvrage oral (2ème œuvre VO)',120),
+  t('2026-08-10','espagnol','Espagnol DST finale (simulation complète)',60),
+  t('2026-08-10','autre','Python — finaliser (projet court)',120),
+]);
+addDay('potes','2026-08-11',[
+  t('2026-08-11','maths','Annale ECG chronométrée',180),
+  t('2026-08-11','esh','ESH khôlle',120),
+  t('2026-08-11','maths','Maths khôlle',120),
+  t('2026-08-11','lettres','Lettres DS n°6 + relecture fiches œuvres',120),
+  t('2026-08-11','anglais','Anglais + Espagnol review mixte (30 min chacun)',60),
+  t('2026-08-11','lettres','Boulle, La Planète des singes + fiche 6 sections',90),
+]);
+addDay('potes','2026-08-12',[
+  t('2026-08-12','maths','Dernière annale ECG de la semaine',180),
+  t('2026-08-12','esh','ESH khôlle finale (révision globale, questions transversales)',120),
+  t('2026-08-12','maths','Maths khôlle finale (mix de tous les chapitres)',120),
+  t('2026-08-12','lettres','Lettres + Philo — relecture de toutes les fiches accumulées',120),
+  t('2026-08-12','espagnol','Espagnol actu + DST courte',60),
+]);
+addDay('potes','2026-08-13',[]); // OFF
+
+/* ---- BnF ---- */
+addDay('bnf','2026-08-14',[
+  t('2026-08-14','maths','Fiche formules + 3 chapitres faibles ciblés',150),
+  t('2026-08-14','esh','Annale ESH complète chronométrée + autocorrection',150),
+  t('2026-08-14','lettres','Relecture des 11 fiches œuvres lettres/philo',120),
+]);
+addDay('bnf','2026-08-15',[
+  t('2026-08-15','espagnol','Espagnol révision DST (Al Grano ciblé points faibles)',120),
+]); // light / férié
+addDay('bnf','2026-08-16',[
+  t('2026-08-16','maths','Annale ECG chronométrée + correction',150),
+  t('2026-08-16','philo','10 auteurs par cœur sans notes (restitution écrite complète)',90),
+  t('2026-08-16','esh','Annale ESH chronométrée courte + correction',120),
+]);
+addDay('bnf','2026-08-17',[
+  t('2026-08-17','maths','Annale ECG chronométrée + correction',150),
+  t('2026-08-17','anglais','Big Picture : 4 thèmes (société US/UK, genre, environnement, techno)',150),
+  t('2026-08-17','espagnol','Al Grano systématique + actu',120),
+]);
+addDay('bnf','2026-08-18',[
+  t('2026-08-18','maths','Annale ECG chronométrée + correction',150),
+  t('2026-08-18','esh','Révision chapitres faibles ciblée + Anki review total',150),
+  t('2026-08-18','lettres','3 plans de dissertation sur « L\'humanité »',120),
+]);
+addDay('bnf','2026-08-19',[
+  t('2026-08-19','maths','Annale ECG chronométrée + correction',150),
+  t('2026-08-19','anglais','Big Picture : 4 thèmes restants + Word Perfect',150),
+  t('2026-08-19','espagnol','Al Grano (fin) + simulation DST complète écrite',120),
+]);
+addDay('bnf','2026-08-20',[
+  t('2026-08-20','maths','Annale ECG chronométrée + correction',150),
+  t('2026-08-20','esh','Annale ESH complète chronométrée',150),
+  t('2026-08-20','philo','3 introductions de dissertation + mise en réseau œuvres/auteurs',120),
+]);
+addDay('bnf','2026-08-21',[
+  t('2026-08-21','maths','Annale ECG chronométrée + correction',150),
+  t('2026-08-21','lettres','3 plans + 1 intro rédigée + relecture corrigé dissert sept. 2025',150),
+  t('2026-08-21','esh','Révision colle semaine 1 + Plihon synthèse finale',120),
+]);
+addDay('bnf','2026-08-22',[
+  t('2026-08-22','maths','Annale ECG chronométrée + correction',150),
+  t('2026-08-22','anglais','Fiches œuvres VO (1984, Of Mice and Men, Never Let Me Go) + présentation oral x3',150),
+  t('2026-08-22','espagnol','Révision finale DST semaine 1 (simulation complète)',120),
+]);
+addDay('bnf','2026-08-23',[
+  t('2026-08-23','maths','Annale ECG chronométrée + correction',150),
+  t('2026-08-23','esh','Annale ESH chronométrée courte',90),
+  t('2026-08-23','philo','Philo + Lettres — mise en réseau finale (tableau croisé thèmes × œuvres)',120),
+]);
+addDay('bnf','2026-08-24',[
+  t('2026-08-24','maths','Fiche formules + Amyot exercices difficiles repris',150),
+  t('2026-08-24','esh','Toutes matières — Anki review massif (priorité cartes en échec)',150),
+  t('2026-08-24','lettres','Bilan écrit : maîtrisé vs fragilités, matière par matière',120),
+]);
+
+/* ---- UPEC ---- */
+addDay('upec','2026-08-25',[
+  t('2026-08-25','maths','Annale ECG chronométrée + correction',180),
+  t('2026-08-25','esh','Révision colle semaine 1 + Plihon par cœur (restitution orale)',180),
+  t('2026-08-25','espagnol','Simulation DST complète (conditions réelles)',120),
+]);
+addDay('upec','2026-08-26',[
+  t('2026-08-26','maths','Annale ECG chronométrée + correction',180),
+  t('2026-08-26','anglais','Simulation écrite type concours + autocorrection + Word Perfect',180),
+  t('2026-08-26','lettres','Plans dissert + auteurs philo restitution orale',120),
+]);
+addDay('upec','2026-08-27',[
+  t('2026-08-27','maths','Révision finale tous types d\'exercices concours (45min/thème)',180),
+  t('2026-08-27','esh','Annale ESH chronométrée + révision colle',180),
+  t('2026-08-27','esh','Toutes matières — Anki review total (dernière passe)',120),
+]);
+addDay('upec','2026-08-28',[
+  t('2026-08-28','maths','Fiche formules par cœur sans notes + dernière annale ECG',180),
+  t('2026-08-28','anglais','Présentation d\'ouvrage x5 chronométrée + Espagnol actu/révision',180),
+  t('2026-08-28','philo','Lettres/Philo — rapport jury HEC, comparaison copie 14 vs copie 18',120),
+]);
+addDay('upec','2026-08-29',[
+  t('2026-08-29','esh','ESH colle semaine 1 finale + Plihon dernière relecture',180),
+  t('2026-08-29','maths','Fiche formules dernière lecture + fiches œuvres/philo',120),
+]);
+
+const ALL_DAYS = PHASES.flatMap(p=>p.days.map(d=>({...d})));
+const ALL_TASKS = ALL_DAYS.flatMap(d=>d.tasks);
+
+/* =========================================================================
+   ÉTAT (localStorage)
+========================================================================= */
+const LS_DONE = 'ecg_planning_done_v1';
+const LS_ANKI = 'ecg_planning_anki_v1';
+
+function loadDone(){ try{ return JSON.parse(localStorage.getItem(LS_DONE)) || {}; }catch(e){ return {}; } }
+function saveDone(obj){ localStorage.setItem(LS_DONE, JSON.stringify(obj)); }
+function loadAnki(){ try{ return JSON.parse(localStorage.getItem(LS_ANKI)) || {}; }catch(e){ return {}; } }
+function saveAnki(obj){ localStorage.setItem(LS_ANKI, JSON.stringify(obj)); }
+
+let done = loadDone();
+let ankiDone = loadAnki();
+
+/* =========================================================================
+   DATES / HELPERS
+========================================================================= */
+function todayISO(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+const TODAY = todayISO();
+
+function fmtDateLong(iso){
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('fr-FR',{weekday:'long', day:'numeric', month:'long'});
+}
+function fmtDateShort(iso){
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('fr-FR',{weekday:'short', day:'numeric', month:'short'});
+}
+function dayOfPhaseFlex(day){
+  const ph = PHASES.find(p=>p.key===day.phaseKey);
+  const base = ph.flexKey;
+  if(day.isOff) return FLEX[base+'-off'] ?? FLEX[base+'-normal'] ?? 60;
+  if(day.isLight) return FLEX[base+'-light'] ?? 200;
+  return FLEX[base+'-normal'] ?? 45;
+}
+
+/* =========================================================================
+   MOTEUR DE REPROGRAMMATION
+========================================================================= */
+function priorityOf(task){
+  if(task.dissert) return 2; // dissertations traitées comme priorité haute quel que soit le sujet
+  return SUBJECTS[task.subject].priority;
+}
+
+function computeReschedule(){
+  const pastDays = ALL_DAYS.filter(d => d.date < TODAY);
+  const futureDays = ALL_DAYS.filter(d => d.date >= TODAY).sort((a,b)=> a.date < b.date ? -1 : 1);
+
+  let backlog = [];
+  pastDays.forEach(d=>{
+    d.tasks.forEach(task=>{
+      if(!done[task.id]) backlog.push(task);
+    });
+  });
+
+  backlog.sort((a,b)=>{
+    const pa = priorityOf(a), pb = priorityOf(b);
+    if(pa !== pb) return pa - pb;
+    return a.date < b.date ? -1 : 1;
+  });
+
+  const remainingCapacity = {};
+  futureDays.forEach(d=> remainingCapacity[d.date] = dayOfPhaseFlex(d));
+
+  const assignment = {}; // taskId -> date
+  const overflow = [];
+
+  backlog.forEach(task=>{
+    let placed = false;
+    for(const d of futureDays){
+      if(remainingCapacity[d.date] >= task.dur){
+        remainingCapacity[d.date] -= task.dur;
+        assignment[task.id] = d.date;
+        placed = true;
+        break;
+      }
+    }
+    if(!placed) overflow.push(task);
+  });
+
+  return {backlog, assignment, overflow};
+}
+
+/* =========================================================================
+   CALCULS DE PROGRESSION
+========================================================================= */
+function computeStats(){
+  let totalMin=0, doneMin=0, expectedMin=0, expectedDone=0;
+  const perSubject = {};
+  Object.keys(SUBJECTS).forEach(k=> perSubject[k] = {total:0, done:0});
+
+  ALL_TASKS.forEach(task=>{
+    totalMin += task.dur;
+    perSubject[task.subject].total += task.dur;
+    const isDone = !!done[task.id];
+    if(isDone){ doneMin += task.dur; perSubject[task.subject].done += task.dur; }
+    if(task.date <= TODAY){
+      expectedMin += task.dur;
+      if(isDone) expectedDone += task.dur;
+    }
+  });
+
+  const annalesCount = ALL_TASKS.filter(t=> done[t.id] && /annale/i.test(t.label)).length;
+  const dissertCount = ALL_TASKS.filter(t=> t.dissert && done[t.id]).length;
+  const dissertTotal = ALL_TASKS.filter(t=> t.dissert).length;
+  const doneCount = ALL_TASKS.filter(t=> done[t.id]).length;
+
+  const lastDate = '2026-08-29';
+  const daysLeft = Math.max(0, Math.round((new Date(lastDate) - new Date(TODAY)) / 86400000));
+
+  return {totalMin, doneMin, expectedMin, expectedDone, perSubject, annalesCount, dissertCount, dissertTotal, doneCount, daysLeft};
+}
+
+/* =========================================================================
+   RENDU
+========================================================================= */
+function taskRow(task, opts){
+  opts = opts || {};
+  const isDone = !!done[task.id];
+  const meta = SUBJECTS[task.subject];
+  const div = document.createElement('div');
+  div.className = 'task' + (isDone ? ' done' : '');
+  div.innerHTML = `
+    <input type="checkbox" ${isDone?'checked':''} data-task="${task.id}">
+    <div class="t-body">
+      <div class="t-label">${task.label}</div>
+      <div class="t-meta">
+        <span class="chip" style="background:${meta.color}22;color:${meta.color}">${meta.label}</span>
+        <span class="chip dur">${task.dur} min</span>
+        ${task.dissert ? '<span class="chip dissert">Dissertation</span>' : ''}
+        ${opts.reschedTag ? `<span class="chip resched">${opts.reschedTag}</span>` : ''}
+      </div>
+    </div>
+  `;
+  div.querySelector('input').addEventListener('change', e=>{
+    if(e.target.checked) done[task.id] = true; else delete done[task.id];
+    saveDone(done);
+    renderAll();
+  });
+  return div;
+}
+
+function renderHero(){
+  const s = computeStats();
+  const pct = s.totalMin ? Math.round(s.doneMin / s.totalMin * 100) : 0;
+  document.getElementById('globalPct').innerHTML = pct + '<small>%</small>';
+  document.getElementById('globalBar').style.width = pct + '%';
+
+  document.getElementById('statAnnales').textContent = s.annalesCount;
+  document.getElementById('statDissert').textContent = s.dissertCount + '/' + s.dissertTotal;
+  document.getElementById('statDaysLeft').textContent = s.daysLeft;
+  document.getElementById('statDone').textContent = s.doneCount;
+
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  const expectedPct = s.expectedMin ? (s.expectedDone / s.expectedMin) : 1;
+  if(s.expectedMin === 0){
+    dot.className = 'dot on-track'; txt.textContent = "le programme n'a pas encore commencé";
+  } else if(expectedPct >= 0.97){
+    dot.className = 'dot on-track'; txt.textContent = 'à jour sur le planning prévu';
+  } else if(expectedPct >= 0.75){
+    dot.className = 'dot behind'; txt.textContent = 'léger retard — ' + Math.round((1-expectedPct)*100) + '% du prévu non fait, reprogrammé ci-dessous';
+  } else {
+    dot.className = 'dot behind'; txt.textContent = 'retard significatif — ' + Math.round((1-expectedPct)*100) + '% du prévu non fait';
+  }
+
+  const wrap = document.getElementById('subjectBars');
+  wrap.innerHTML = '';
+  Object.entries(SUBJECTS).forEach(([key, meta])=>{
+    const st = s.perSubject[key];
+    if(st.total === 0) return;
+    const p = Math.round(st.done/st.total*100);
+    const row = document.createElement('div');
+    row.className = 'subj-row';
+    row.innerHTML = `
+      <div class="subj-name" style="color:${meta.color}">${meta.label}</div>
+      <div class="subj-bar"><i style="width:${p}%;background:${meta.color}"></i></div>
+      <div class="subj-pct">${p}%</div>
+    `;
+    wrap.appendChild(row);
+  });
+}
+
+function renderToday(){
+  const day = ALL_DAYS.find(d=>d.date === TODAY);
+  const titleEl = document.getElementById('todayTitle');
+  const phaseEl = document.getElementById('todayPhase');
+  const listEl = document.getElementById('todayTasks');
+  listEl.innerHTML = '';
+
+  if(!day){
+    titleEl.textContent = fmtDateLong(TODAY);
+    phaseEl.textContent = (TODAY < '2026-07-10') ? 'avant le programme' : 'après le 29 août';
+    listEl.innerHTML = '<div class="empty">Aucune tâche planifiée pour aujourd\'hui dans ce document.</div>';
+  } else {
+    titleEl.textContent = fmtDateLong(TODAY) + (day.isOff ? ' — OFF' : (day.isLight ? ' — allégé (fermé)' : ''));
+    const ph = PHASES.find(p=>p.key===day.phaseKey);
+    phaseEl.textContent = ph.label;
+
+    const {assignment} = computeReschedule();
+    // tâches du jour qui n'ont pas été délestées (elles restent car datées d'aujourd'hui même = pas encore "en retard")
+    if(day.tasks.length === 0){
+      listEl.innerHTML = '<div class="empty">Journée off — repos, ou dissertation déjà listée ici si prévue.</div>';
+    }
+    day.tasks.forEach(task=> listEl.appendChild(taskRow(task)));
+
+    // tâches reprogrammées vers aujourd'hui depuis un jour passé
+    Object.entries(assignment).forEach(([taskId, date])=>{
+      if(date === TODAY){
+        const task = ALL_TASKS.find(x=>x.id===taskId);
+        listEl.appendChild(taskRow(task, {reschedTag:'reprogrammé (retard du ' + fmtDateShort(task.date) + ')'}));
+      }
+    });
+  }
+
+  // anki
+  const ankiBox = document.getElementById('ankiToday');
+  ankiBox.checked = !!ankiDone[TODAY];
+  ankiBox.onchange = ()=>{
+    if(ankiBox.checked) ankiDone[TODAY] = true; else delete ankiDone[TODAY];
+    saveAnki(ankiDone);
+    renderStreak();
+  };
+  renderStreak();
+}
+
+function renderStreak(){
+  let streak = 0;
+  let d = new Date(TODAY+'T00:00:00');
+  while(true){
+    const iso = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    if(ankiDone[iso]){ streak++; d.setDate(d.getDate()-1); } else break;
+  }
+  document.getElementById('ankiStreak').textContent = 'série : ' + streak + 'j';
+}
+
+function renderBacklog(){
+  const {backlog, assignment, overflow} = computeReschedule();
+  const queueEl = document.getElementById('queueList');
+  const overflowEl = document.getElementById('overflowList');
+  queueEl.innerHTML = '';
+  overflowEl.innerHTML = '';
+
+  const placed = backlog.filter(t=> assignment[t.id]);
+  if(placed.length === 0){
+    queueEl.innerHTML = '<div class="empty">Aucune tâche en retard. Tout est à jour.</div>';
+  } else {
+    placed.forEach(task=>{
+      const row = document.createElement('div');
+      row.className = 'row-line';
+      row.innerHTML = `<div class="lbl">${SUBJECTS[task.subject].label} — ${task.label} <span style="color:var(--text-faint)">(${fmtDateShort(task.date)})</span></div><div class="dest">→ ${fmtDateShort(assignment[task.id])}</div>`;
+      queueEl.appendChild(row);
+    });
+  }
+
+  if(overflow.length === 0){
+    overflowEl.innerHTML = '<div class="empty">Rien à sacrifier pour l\'instant.</div>';
+  } else {
+    overflow.forEach(task=>{
+      const row = document.createElement('div');
+      row.className = 'row-line';
+      row.innerHTML = `<div class="lbl">${SUBJECTS[task.subject].label} — ${task.label} <span style="color:var(--text-faint)">(${fmtDateShort(task.date)})</span></div><div class="dest bad">aucun créneau</div>`;
+      overflowEl.appendChild(row);
+    });
+  }
+}
+
+function renderAllView(){
+  const {assignment} = computeReschedule();
+  const wrap = document.getElementById('allPhases');
+  wrap.innerHTML = '';
+  PHASES.forEach(ph=>{
+    const block = document.createElement('div');
+    block.className = 'phase-block';
+    block.innerHTML = `
+      <div class="phase-title"><h3>${ph.label}</h3><span class="rng">${ph.range}</span></div>
+      <div class="phase-bilan">${ph.bilan}</div>
+      <div class="days-grid" id="grid-${ph.key}"></div>
+    `;
+    wrap.appendChild(block);
+    const grid = block.querySelector('#grid-' + ph.key);
+    ph.days.forEach(day=>{
+      const card = document.createElement('div');
+      let cls = 'day-card';
+      if(day.date === TODAY) cls += ' is-today';
+      else if(day.date < TODAY) cls += ' is-past';
+      if(day.isOff) cls += ' is-off';
+      card.className = cls;
+
+      const totalTasks = day.tasks.length;
+      const doneTasks = day.tasks.filter(t=>done[t.id]).length;
+      const pctTxt = totalTasks ? doneTasks + '/' + totalTasks : (day.isOff ? 'OFF' : '—');
+
+      card.innerHTML = `<div class="day-card-head"><span class="day-date">${fmtDateShort(day.date)}</span><span class="day-pct">${pctTxt}</span></div>`;
+
+      if(day.tasks.length === 0 && day.isOff){
+        card.innerHTML += '<div class="empty">Journée off</div>';
+      }
+      day.tasks.forEach(task=> card.appendChild(taskRow(task)));
+
+      Object.entries(assignment).forEach(([taskId, date])=>{
+        if(date === day.date){
+          const task = ALL_TASKS.find(x=>x.id===taskId);
+          card.appendChild(taskRow(task, {reschedTag:'reprogrammé'}));
+        }
+      });
+
+      grid.appendChild(card);
+    });
+  });
+}
+
+function renderTicker(){
+  const s = computeStats();
+  const bits = [
+    `<span class="warn">ECG-STATUS</span> ${fmtDateLong(TODAY)}`,
+    `<span class="up">MATHS ${Math.round((s.perSubject.maths.done/(s.perSubject.maths.total||1))*100)}%</span>`,
+    `<span class="up">ESH ${Math.round((s.perSubject.esh.done/(s.perSubject.esh.total||1))*100)}%</span>`,
+    `<span>LETTRES ${Math.round((s.perSubject.lettres.done/(s.perSubject.lettres.total||1))*100)}%</span>`,
+    `<span>PHILO ${Math.round((s.perSubject.philo.done/(s.perSubject.philo.total||1))*100)}%</span>`,
+    `<span class="down">ANGLAIS ${Math.round((s.perSubject.anglais.done/(s.perSubject.anglais.total||1))*100)}%</span>`,
+    `<span class="down">ESPAGNOL ${Math.round((s.perSubject.espagnol.done/(s.perSubject.espagnol.total||1))*100)}%</span>`,
+    `ANNALES ${s.annalesCount}`,
+    `DISSERT ${s.dissertCount}/${s.dissertTotal}`,
+    `J-${s.daysLeft} AVANT RENTRÉE`,
+  ];
+  document.getElementById('tickerTrack').innerHTML = bits.map(b=>'<span>'+b+'</span>').join('');
+}
+
+function renderClock(){
+  const el = document.getElementById('clock');
+  function tick(){
+    const now = new Date();
+    el.textContent = now.toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'}) + '  ' + now.toLocaleTimeString('fr-FR');
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+function renderAll(){
+  renderHero();
+  renderToday();
+  renderBacklog();
+  renderAllView();
+  renderTicker();
+}
+
+/* =========================================================================
+   NAVIGATION
+========================================================================= */
+document.getElementById('navBtns').addEventListener('click', e=>{
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  document.querySelectorAll('#navBtns button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['today','backlog','all'].forEach(v=>{
+    document.getElementById('view-'+v).style.display = (v===btn.dataset.view) ? '' : 'none';
+  });
+});
+
+document.getElementById('recalcBtn').addEventListener('click', renderAll);
+
+/* =========================================================================
+   INIT
+========================================================================= */
+renderClock();
+renderAll();
+</script>
+</body>
+</html>
